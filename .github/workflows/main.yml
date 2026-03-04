@@ -44,7 +44,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: "v__VERSION__" # 自定义Release的标签名字
+          tagName: v__VERSION__ # 自定义Release的标签名字
           releaseName: "RestReminder v__VERSION__"
           releaseBody: "这里是本次更新的说明..."
           releaseDraft: true     # 是否将打包后的Release标记为草稿方便你检查后再发布
