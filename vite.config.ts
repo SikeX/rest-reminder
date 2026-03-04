@@ -1,0 +1,23 @@
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+
+// https://vitejs.dev/config/
+export default defineConfig(async () => ({
+  plugins: [react()],
+
+  // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
+  //
+  // 1. prevent vite from obscuring rust errors
+  clearScreen: false,
+  // 2. tauri expects a fixed port, fail if that port is not available
+  server: {
+    host: "127.0.0.1",
+    port: 5173,
+    strictPort: true,
+    // 3. to use a React app router instead of a browser router, set
+    //    base: "" // relative to the "index.html" file
+  },
+  // 3. to make use of `TAURI_DEBUG` and other env variables
+  //    https://tauri.app/v1/api/config#buildconfig.beforedevcommand
+  envPrefix: ["VITE_", "TAURI_"],
+}));
