@@ -2,10 +2,110 @@ mod commands;
 mod timer;
 
 use std::sync::Arc;
-use tauri::Manager;
+use tauri::{Manager, PhysicalPosition, Position, WebviewWindow};
 use tauri_plugin_store::StoreBuilder;
 use tokio::sync::Mutex;
 use timer::{run_timer_loop, SharedTimer, Timer, TimerConfig, TimerStateChange};
+
+/// Place the reminder window at the bottom-right of the primary work area
+/// (above the Windows taskbar / macOS dock). Prefer primary monitor so a
+/// still-hidden window does not fall back to a wrong/centered position.
+pub fn place_reminder_bottom_right(window: &WebviewWindow) {
+    const MARGIN: i32 = 16;
+
+    let monitor = window
+        .primary_monitor()
+        .ok()
+        .flatten()
+        .or_else(|| window.current_monitor().ok().flatten());
+
+    let Some(monitor) = monitor else {
+        log::warn!("place_reminder: no monitor available");
+        return;
+    };
+
+    let Ok(outer) = window.outer_size() else {
+        log::warn!("place_reminder: outer_size failed");
+        return;
+    };
+
+    // work_area excludes the taskbar/dock; values are physical pixels.
+    let work = monitor.work_area();
+    let area_x = work.position.x;
+    let area_y = work.position.y;
+    let area_w = work.size.width as i32;
+    let area_h = work.size.height as i32;
+    let win_w = outer.width as i32;
+    let win_h = outer.height as i32;
+
+    if area_w <= 0 || area_h <= 0 || win_w <= 0 || win_h <= 0 {
+        log::warn!(
+            "place_reminder: invalid sizes area={}x{} win={}x{}",
+            area_w,
+            area_h,
+            win_w,
+            win_h
+        );
+        return;
+    }
+
+    let x = (area_x + area_w - win_w - MARGIN).max(area_x);
+    let y = (area_y + area_h - win_h - MARGIN).max(area_y);
+
+    if let Err(err) = window.set_position(Position::Physical(PhysicalPosition::new(x, y))) {
+        log::warn!("place_reminder: set_position failed: {err}");
+    } else {
+        log::info!("place_reminder: moved to physical ({x}, {y}) on work area {area_w}x{area_h}");
+    }
+}
+
+/// Show the reminder window at bottom-right; create it if missing.
+/// Uses the system title bar (`decorations: true`) — never a mocked traffic-light bar.
+pub fn show_reminder(app: &tauri::AppHandle, title: &str) {
+    if let Some(window) = app.get_webview_window("reminder") {
+        let _ = window.set_title(title);
+        // Position while still hidden, show, then re-place once decorations
+        // contribute to outer_size. A short delayed re-place covers Windows DPI races.
+        place_reminder_bottom_right(&window);
+        let _ = window.show();
+        let _ = window.unminimize();
+        place_reminder_bottom_right(&window);
+        let _ = window.set_focus();
+
+        let delayed = window.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            place_reminder_bottom_right(&delayed);
+            let _ = delayed.set_focus();
+        });
+        return;
+    }
+
+    let built = tauri::WebviewWindowBuilder::new(
+        app,
+        "reminder",
+        tauri::WebviewUrl::App("index.html".parse().unwrap()),
+    )
+    .title(title)
+    .inner_size(360.0, 220.0)
+    .min_inner_size(320.0, 180.0)
+    .resizable(false)
+    .always_on_top(true)
+    .decorations(true)
+    .visible(true)
+    .skip_taskbar(true)
+    .build();
+
+    if let Ok(window) = built {
+        place_reminder_bottom_right(&window);
+        let _ = window.set_focus();
+        let delayed = window.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            place_reminder_bottom_right(&delayed);
+        });
+    }
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -56,55 +156,27 @@ pub fn run() {
                 while let Some(change) = rx.recv().await {
                     match change {
                         TimerStateChange::WorkComplete => {
-                            log::info!("Work complete, showing reminder");
-                            // Emit show-reminder event to frontend so React state shows the UI
+                            log::info!("Work complete, showing reminder at bottom-right");
                             use tauri::Emitter;
+                            // Emit first so the reminder webview can update copy,
+                            // then show + pin to bottom-right of the primary work area.
                             let _ = app_handle.emit("show-reminder", ());
-
-                            if let Some(window) = app_handle.get_webview_window("reminder") {
-                                let _ = window.show();
-                                let _ = window.set_focus();
-                            } else {
-                                // 如果窗口不存在，则创建它
-                                let _ = tauri::WebviewWindowBuilder::new(&app_handle, "reminder", tauri::WebviewUrl::App("index.html".parse().unwrap()))
-                                    .title("提醒")
-                                    .inner_size(400.0, 550.0)
-                                    .min_inner_size(400.0, 550.0)
-                                    .resizable(false)
-                                    .always_on_top(true)
-                                    .decorations(false)
-                                    .center()
-                                    .visible(true)
-                                    .skip_taskbar(true)
-                                    .build();
-                            }
+                            show_reminder(&app_handle, "休息提醒");
                         }
                         TimerStateChange::RestComplete => {
-                            log::info!("Rest complete, showing work reminder");
+                            log::info!("Rest complete, showing work reminder at bottom-right");
                             use tauri::Emitter;
                             let _ = app_handle.emit("show-work-reminder", ());
-                            
-                            if let Some(window) = app_handle.get_webview_window("reminder") {
-                                let _ = window.show();
-                                let _ = window.set_focus();
-                            } else {
-                                let _ = tauri::WebviewWindowBuilder::new(&app_handle, "reminder", tauri::WebviewUrl::App("index.html".parse().unwrap()))
-                                    .title("提醒")
-                                    .inner_size(400.0, 550.0)
-                                    .min_inner_size(400.0, 550.0)
-                                    .resizable(false)
-                                    .always_on_top(true)
-                                    .decorations(false)
-                                    .center()
-                                    .visible(true)
-                                    .skip_taskbar(true)
-                                    .build();
-                            }
+                            show_reminder(&app_handle, "工作提醒");
                         }
                     }
                 }
             });
 
+            // 启动时把预创建的提醒窗放到右下角（仍保持隐藏）
+            if let Some(window) = app.get_webview_window("reminder") {
+                place_reminder_bottom_right(&window);
+            }
 
             // 设置系统托盘
             setup_tray(app)?;

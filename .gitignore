@@ -32,3 +32,8 @@ src-tauri/gen/schemas/
 .env
 .env.*
 !.env.example
+# 智能体/工具本地文件（不提交）
+.agents/
+.od-skills/
+.claude/
+*.artifact.json

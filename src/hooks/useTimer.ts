@@ -13,26 +13,14 @@ export function useTimer() {
     loadState();
     loadConfig();
 
-    // 监听计时器更新事件
+    // 计时状态由后端 timer loop 推送；提醒窗的显示/定位也由后端负责
+    //（show-reminder / show-work-reminder + place_reminder_bottom_right）。
     const unlistenTimer = listen<TimerStatus>("timer-update", (event) => {
       setStatus(event.payload);
     });
 
-    // 监听工作完成事件
-    const unlistenWork = listen("work-complete", () => {
-      showReminderWindow();
-    });
-
-    // 监听休息完成事件
-    const unlistenRest = listen("rest-complete", () => {
-      // 休息完成后不再自动开始工作，而是显示工作提醒弹窗
-      showReminderWindow();
-    });
-
     return () => {
-      unlistenTimer.then(f => f());
-      unlistenWork.then(f => f());
-      unlistenRest.then(f => f());
+      unlistenTimer.then((f) => f());
     };
   }, []);
 

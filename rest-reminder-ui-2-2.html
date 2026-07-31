@@ -1,0 +1,1089 @@
+
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Rest Reminder — 桌面应用原型</title>
+<style>
+  :root {
+    --bg:      oklch(99% 0.002 240);
+    --surface: oklch(100% 0 0);
+    --fg:      oklch(18% 0.012 250);
+    --muted:   oklch(50% 0.012 250);
+    --border:  oklch(91% 0.005 250);
+    --accent:  oklch(52% 0.16 255);
+    --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+    --font-body:    -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+    --font-mono:    'SF Mono', ui-monospace, Menlo, Consolas, monospace;
+    --ok:      oklch(52% 0.12 155);
+    --warn:    oklch(62% 0.13 75);
+    --rest:    oklch(50% 0.11 170);
+    --radius:  12px;
+    --shadow:  0 1px 2px oklch(18% 0.012 250 / 0.04), 0 8px 24px oklch(18% 0.012 250 / 0.06);
+    --shadow-lg: 0 2px 4px oklch(18% 0.012 250 / 0.04), 0 16px 48px oklch(18% 0.012 250 / 0.10);
+    --shadow-toast: 0 10px 32px oklch(18% 0.012 250 / 0.14), 0 2px 8px oklch(18% 0.012 250 / 0.06);
+    --ease: cubic-bezier(0.2, 0, 0, 1);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--fg);
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.5;
+  }
+  .sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0,0,0,0);
+    white-space: nowrap; border: 0;
+  }
+  .desktop {
+    min-height: 100vh;
+    padding: 36px 28px 88px;
+    background:
+      radial-gradient(ellipse 70% 42% at 50% -8%, oklch(96.5% 0.008 250), transparent 58%),
+      var(--bg);
+  }
+  .desktop-header {
+    max-width: 400px;
+    margin: 0 auto 24px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .desktop-header h1 {
+    font-family: var(--font-display);
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    margin-top: 4px;
+  }
+  .desktop-header p {
+    font-size: 12.5px;
+    color: var(--muted);
+    text-align: right;
+    max-width: 11em;
+    line-height: 1.4;
+  }
+  .stage-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .stage { max-width: 400px; margin: 0 auto; }
+  .win {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+  }
+  .win-titlebar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 40px;
+    padding: 0 14px;
+    border-bottom: 1px solid var(--border);
+    background: color-mix(in oklch, var(--surface) 88%, var(--bg));
+    user-select: none;
+  }
+  .traffic { display: flex; gap: 6px; flex-shrink: 0; }
+  .traffic span {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: color-mix(in oklch, var(--border) 70%, var(--muted));
+  }
+  .traffic .c1 { background: oklch(68% 0.14 25); }
+  .traffic .c2 { background: oklch(74% 0.13 85); }
+  .traffic .c3 { background: oklch(66% 0.12 145); }
+  .win-title {
+    flex: 1;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 510;
+    color: var(--muted);
+    letter-spacing: -0.01em;
+    margin-right: 40px;
+  }
+  .main-win { min-height: 0; }
+  .main-body {
+    padding: 24px 28px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+  .mode-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .mode-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 28px;
+    padding: 5px 11px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    font-size: 12px;
+    font-weight: 510;
+    letter-spacing: 0.01em;
+    color: var(--muted);
+  }
+  .mode-pill .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--muted);
+    flex-shrink: 0;
+  }
+  .mode-pill.is-work .dot { background: var(--accent); }
+  .mode-pill.is-work {
+    color: var(--fg);
+    border-color: color-mix(in oklch, var(--accent) 28%, var(--border));
+    background: color-mix(in oklch, var(--accent) 5%, var(--surface));
+  }
+  .mode-pill.is-rest .dot { background: var(--rest); }
+  .mode-pill.is-rest {
+    color: var(--fg);
+    border-color: color-mix(in oklch, var(--rest) 28%, var(--border));
+    background: color-mix(in oklch, var(--rest) 6%, var(--surface));
+  }
+  .mode-pill.is-idle .dot {
+    background: color-mix(in oklch, var(--muted) 55%, var(--border));
+  }
+  .session-meta {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+  }
+  .timer-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 0 2px;
+  }
+  .ring-wrap {
+    position: relative;
+    width: min(200px, 56vw);
+    height: min(200px, 56vw);
+  }
+  .ring-wrap svg {
+    width: 100%; height: 100%;
+    transform: rotate(-90deg);
+  }
+  .ring-track {
+    fill: none;
+    stroke: color-mix(in oklch, var(--border) 85%, var(--muted));
+    stroke-width: 5.5;
+  }
+  .ring-prog {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 5.5;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.3s linear, stroke 0.2s ease;
+  }
+  .ring-wrap.is-rest .ring-prog { stroke: var(--rest); }
+  .ring-wrap.is-idle .ring-prog {
+    stroke: color-mix(in oklch, var(--border) 40%, var(--muted));
+  }
+  .ring-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    pointer-events: none;
+  }
+  .time-display {
+    font-family: var(--font-display);
+    font-size: clamp(40px, 11vw, 46px);
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    color: var(--fg);
+  }
+  .time-caption {
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 510;
+    letter-spacing: 0.01em;
+  }
+  .progress-pct {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+    min-height: 1.2em;
+  }
+  .controls {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+  }
+  .btn {
+    appearance: none;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--fg);
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 550;
+    letter-spacing: 0.02em;
+    min-height: 44px;
+    height: 44px;
+    padding: 0 18px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition:
+      background 0.15s var(--ease),
+      border-color 0.15s var(--ease),
+      box-shadow 0.15s var(--ease),
+      color 0.15s var(--ease),
+      transform 0.08s ease,
+      opacity 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+  }
+  .btn:hover:not(:disabled) {
+    background: var(--bg);
+    border-color: color-mix(in oklch, var(--border) 70%, var(--muted));
+  }
+  .btn:active:not(:disabled) { transform: scale(0.98); }
+  .btn:focus-visible {
+    outline: 2px solid color-mix(in oklch, var(--accent) 55%, transparent);
+    outline-offset: 2px;
+  }
+  .btn-primary {
+    background: var(--accent);
+    border-color: color-mix(in oklch, var(--accent) 78%, black);
+    color: oklch(99% 0 0);
+    min-width: 120px;
+    box-shadow: 0 1px 2px oklch(35% 0.1 255 / 0.22);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: color-mix(in oklch, var(--accent) 86%, black);
+    border-color: color-mix(in oklch, var(--accent) 70%, black);
+  }
+  .btn-primary.is-rest-mode {
+    background: var(--rest);
+    border-color: color-mix(in oklch, var(--rest) 78%, black);
+    box-shadow: 0 1px 2px oklch(35% 0.08 170 / 0.22);
+  }
+  .btn-primary.is-rest-mode:hover:not(:disabled) {
+    background: color-mix(in oklch, var(--rest) 86%, black);
+  }
+  .btn:disabled {
+    opacity: 0.42;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+  .btn svg { width: 14px; height: 14px; flex-shrink: 0; }
+  .settings {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: color-mix(in oklch, var(--bg) 70%, var(--surface));
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .setting-row {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) 52px;
+    align-items: center;
+    gap: 10px;
+  }
+  .setting-label {
+    font-size: 13px;
+    font-weight: 510;
+    color: var(--fg);
+    letter-spacing: 0.01em;
+  }
+  .setting-val {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--muted);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+  }
+  .range-wrap {
+    position: relative;
+    height: 28px;
+    display: flex;
+    align-items: center;
+  }
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--border);
+    outline: none;
+    cursor: pointer;
+    margin: 0;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--surface);
+    border: 1.5px solid color-mix(in oklch, var(--fg) 22%, var(--border));
+    box-shadow: 0 1px 3px oklch(18% 0.012 250 / 0.14);
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--surface);
+    border: 1.5px solid color-mix(in oklch, var(--fg) 22%, var(--border));
+    box-shadow: 0 1px 3px oklch(18% 0.012 250 / 0.14);
+    cursor: pointer;
+  }
+  input[type="range"]:hover:not(:disabled)::-webkit-slider-thumb {
+    border-color: color-mix(in oklch, var(--fg) 35%, var(--border));
+  }
+  input[type="range"]:focus-visible { outline: none; }
+  input[type="range"]:focus-visible::-webkit-slider-thumb {
+    outline: 2px solid color-mix(in oklch, var(--accent) 55%, transparent);
+    outline-offset: 2px;
+  }
+  input[type="range"]:focus-visible::-moz-range-thumb {
+    outline: 2px solid color-mix(in oklch, var(--accent) 55%, transparent);
+    outline-offset: 2px;
+  }
+  input[type="range"]:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .toggle-label { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .toggle-label strong {
+    font-size: 13px;
+    font-weight: 550;
+    letter-spacing: 0.01em;
+  }
+  .toggle-label span { font-size: 12px; color: var(--muted); line-height: 1.4; }
+  .switch {
+    position: relative;
+    width: 44px;
+    height: 28px;
+    flex-shrink: 0;
+  }
+  .switch input {
+    position: absolute;
+    inset: 0;
+    width: 100%; height: 100%;
+    opacity: 0;
+    margin: 0;
+    cursor: pointer;
+    z-index: 1;
+  }
+  .switch-track {
+    position: absolute; inset: 0; border-radius: 999px;
+    background: color-mix(in oklch, var(--border) 80%, var(--muted));
+    transition: background 0.18s var(--ease);
+    pointer-events: none;
+  }
+  .switch-track::after {
+    content: "";
+    position: absolute; top: 3px; left: 3px;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--surface);
+    box-shadow: 0 1px 3px oklch(18% 0.012 250 / 0.16);
+    transition: transform 0.18s var(--ease);
+  }
+  .switch input:checked + .switch-track {
+    background: color-mix(in oklch, var(--fg) 78%, var(--muted));
+  }
+  .switch input:checked + .switch-track::after { transform: translateX(16px); }
+  .switch input:focus-visible + .switch-track {
+    outline: 2px solid color-mix(in oklch, var(--accent) 55%, transparent);
+    outline-offset: 2px;
+  }
+  .switch input:disabled { cursor: not-allowed; }
+  .switch input:disabled + .switch-track { opacity: 0.45; }
+  .stage-foot {
+    margin-top: 14px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--muted);
+    min-height: 18px;
+    line-height: 1.4;
+  }
+  .reminder-win {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    width: min(340px, calc(100vw - 32px));
+    z-index: 60;
+    border-radius: 14px;
+    box-shadow: var(--shadow-toast);
+    transform-origin: bottom right;
+    transition:
+      opacity 0.24s var(--ease),
+      transform 0.24s var(--ease),
+      visibility 0.24s;
+  }
+  .reminder-win.is-hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(12px) scale(0.97);
+  }
+  .reminder-win.is-active {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateY(0) scale(1);
+    border-color: color-mix(in oklch, var(--rest) 22%, var(--border));
+    box-shadow:
+      var(--shadow-toast),
+      0 0 0 1px color-mix(in oklch, var(--rest) 14%, transparent);
+  }
+  .reminder-win .win-titlebar { height: 36px; padding: 0 12px; }
+  .reminder-win .win-title { margin-right: 28px; font-size: 11px; }
+  .reminder-win .traffic span { width: 8px; height: 8px; }
+  .reminder-body {
+    padding: 16px 16px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .reminder-top { display: flex; align-items: flex-start; gap: 12px; }
+  .reminder-icon {
+    width: 40px; height: 40px; flex-shrink: 0; border-radius: 10px;
+    background: color-mix(in oklch, var(--rest) 9%, var(--bg));
+    border: 1px solid color-mix(in oklch, var(--rest) 16%, var(--border));
+    display: grid; place-items: center;
+  }
+  .reminder-icon svg { width: 18px; height: 18px; color: var(--rest); }
+  .reminder-copy { flex: 1; min-width: 0; padding-top: 1px; }
+  .reminder-copy h2 {
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.25;
+    margin-bottom: 4px;
+  }
+  .reminder-copy p {
+    font-size: 12.5px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+  .reminder-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .reminder-actions .btn {
+    width: 100%;
+    min-height: 40px;
+    height: 40px;
+    font-size: 12.5px;
+    padding: 0 10px;
+  }
+  .btn-rest {
+    background: var(--rest);
+    border-color: color-mix(in oklch, var(--rest) 78%, black);
+    color: oklch(99% 0 0);
+    box-shadow: 0 1px 2px oklch(35% 0.08 170 / 0.2);
+  }
+  .btn-rest:hover:not(:disabled) {
+    background: color-mix(in oklch, var(--rest) 86%, black);
+  }
+  .snooze-note {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+    text-align: center;
+    letter-spacing: 0.02em;
+    min-height: 0;
+  }
+  .snooze-note:empty { display: none; }
+  .toast {
+    position: fixed;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%) translateY(10px);
+    background: var(--fg);
+    color: var(--surface);
+    font-size: 13px;
+    font-weight: 510;
+    letter-spacing: 0.01em;
+    padding: 10px 16px;
+    border-radius: 10px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s var(--ease), transform 0.18s var(--ease);
+    z-index: 50;
+    box-shadow: var(--shadow-lg);
+    max-width: min(320px, calc(100vw - 32px));
+    text-align: center;
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  .tweaks { position: fixed; bottom: 14px; left: 14px; z-index: 40; }
+  .tweaks details {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    width: 216px;
+    overflow: hidden;
+  }
+  .tweaks summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 10px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--muted);
+    user-select: none;
+  }
+  .tweaks summary:hover { color: var(--fg); }
+  .tweaks summary:focus-visible {
+    outline: 2px solid color-mix(in oklch, var(--accent) 55%, transparent);
+    outline-offset: -2px;
+  }
+  .tweaks summary::-webkit-details-marker { display: none; }
+  .tweaks-body {
+    padding: 0 14px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+  }
+  .tweaks-body label {
+    display: flex; flex-direction: column; gap: 4px;
+    font-size: 11px; color: var(--muted);
+    letter-spacing: 0.01em;
+  }
+  .tweaks-body select {
+    height: 34px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--fg);
+    font-size: 12px;
+    padding: 0 8px;
+    font-family: var(--font-body);
+  }
+  .tweaks-body select:focus-visible {
+    outline: 2px solid color-mix(in oklch, var(--accent) 55%, transparent);
+    outline-offset: 1px;
+  }
+  @media (max-width: 520px) {
+    .desktop { padding: 20px 14px 100px; }
+    .desktop-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+      margin-bottom: 18px;
+    }
+    .desktop-header p { text-align: left; max-width: none; }
+    .main-body { padding: 20px 18px 22px; gap: 18px; }
+    .setting-row {
+      grid-template-columns: 40px minmax(0, 1fr) 48px;
+      gap: 8px;
+    }
+    .reminder-win {
+      right: 12px; bottom: 12px;
+      width: calc(100vw - 24px);
+      max-width: 340px;
+    }
+    .reminder-actions { grid-template-columns: 1fr; }
+    .reminder-actions .btn { min-height: 44px; height: 44px; }
+    .toast { bottom: calc(12px + min(280px, 50vh)); }
+    .tweaks { bottom: 10px; left: 10px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+    .ring-prog { transition: none; }
+    .reminder-win.is-hidden,
+    .reminder-win.is-active { transform: none; }
+    .toast, .toast.show { transform: translateX(-50%); }
+    .btn:active:not(:disabled) { transform: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="desktop" data-od-id="desktop-canvas">
+    <header class="desktop-header" data-od-id="desktop-header">
+      <div>
+        <div class="stage-label">Tauri · Desktop</div>
+        <h1>Rest Reminder</h1>
+      </div>
+      <p>安静的专注计时 · 右下角轻提醒</p>
+    </header>
+    <div class="stage">
+      <section class="win main-win" data-od-id="main-window" aria-label="Rest Reminder 主窗口">
+        <div class="win-titlebar" data-od-id="main-titlebar">
+          <div class="traffic" aria-hidden="true">
+            <span class="c1"></span><span class="c2"></span><span class="c3"></span>
+          </div>
+          <div class="win-title">Rest Reminder</div>
+        </div>
+        <div class="main-body">
+          <div class="mode-row">
+            <div id="modePill" class="mode-pill is-idle" data-od-id="mode-pill" role="status">
+              <span class="dot" aria-hidden="true"></span>
+              <span id="modeText">待开始</span>
+            </div>
+            <div class="session-meta" id="sessionMeta" data-od-id="session-meta">尚未开始</div>
+          </div>
+          <div class="timer-block" data-od-id="timer-block">
+            <div class="ring-wrap is-idle" id="ringWrap" role="img" aria-labelledby="timeDisplay timeCaption">
+              <svg viewBox="0 0 100 100" aria-hidden="true">
+                <circle class="ring-track" cx="50" cy="50" r="44" />
+                <circle class="ring-prog" id="ringProg" cx="50" cy="50" r="44"
+                  stroke-dasharray="276.46" stroke-dashoffset="0" />
+              </svg>
+              <div class="ring-center">
+                <div class="time-display" id="timeDisplay" data-od-id="time-display" aria-live="off">25:00</div>
+                <div class="time-caption" id="timeCaption">设定工作时长</div>
+              </div>
+            </div>
+            <div class="progress-pct" id="progressPct" data-od-id="progress-pct" aria-hidden="true">准备就绪</div>
+            <div class="sr-only" id="timerLive" aria-live="polite" aria-atomic="true"></div>
+          </div>
+          <div class="controls" data-od-id="controls">
+            <button type="button" class="btn btn-primary" id="btnPrimary" data-od-id="btn-start">
+              <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4 2.5v11l9-5.5-9-5.5z"/></svg>
+              <span>开始</span>
+            </button>
+            <button type="button" class="btn" id="btnReset" data-od-id="btn-reset" disabled aria-label="重置计时">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                <path d="M3 8a5 5 0 0 1 8.5-3.5M13 3v3.5H9.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M13 8a5 5 0 0 1-8.5 3.5M3 13v-3.5H6.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              重置
+            </button>
+          </div>
+          <div class="settings" data-od-id="settings">
+            <div class="setting-row">
+              <label class="setting-label" for="workRange">工作</label>
+              <div class="range-wrap">
+                <input type="range" id="workRange" min="5" max="90" step="5" value="25"
+                  data-od-id="work-slider" aria-valuetext="25 分钟" />
+              </div>
+              <span class="setting-val" id="workVal" aria-hidden="true">25 分</span>
+            </div>
+            <div class="setting-row">
+              <label class="setting-label" for="restRange">休息</label>
+              <div class="range-wrap">
+                <input type="range" id="restRange" min="1" max="30" step="1" value="5"
+                  data-od-id="rest-slider" aria-valuetext="5 分钟" />
+              </div>
+              <span class="setting-val" id="restVal" aria-hidden="true">5 分</span>
+            </div>
+            <div class="toggle-row">
+              <div class="toggle-label" id="soundLabel">
+                <strong>提示音</strong>
+                <span>到点时播放轻提示</span>
+              </div>
+              <label class="switch" data-od-id="sound-toggle">
+                <input type="checkbox" id="soundToggle" checked aria-labelledby="soundLabel" />
+                <span class="switch-track" aria-hidden="true"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </section>
+      <p class="stage-foot" id="reminderHint" data-od-id="reminder-hint">工作结束后将从右下角弹出提醒</p>
+    </div>
+  </div>
+
+  <section
+    class="win reminder-win is-hidden"
+    id="reminderWin"
+    data-od-id="reminder-window"
+    role="alertdialog"
+    aria-modal="false"
+    aria-labelledby="reminderTitle"
+    aria-describedby="reminderDesc"
+    aria-hidden="true"
+  >
+    <div class="win-titlebar">
+      <div class="traffic" aria-hidden="true">
+        <span class="c1"></span><span class="c2"></span><span class="c3"></span>
+      </div>
+      <div class="win-title">休息提醒</div>
+    </div>
+    <div class="reminder-body">
+      <div class="reminder-top">
+        <div class="reminder-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9"/>
+            <path d="M12 7v5l3 2"/>
+          </svg>
+        </div>
+        <div class="reminder-copy">
+          <h2 id="reminderTitle" data-od-id="reminder-title">该休息一下了</h2>
+          <p id="reminderDesc">你已专注完成一轮工作，站起来活动几分钟会更好。</p>
+        </div>
+      </div>
+      <div class="reminder-actions">
+        <button type="button" class="btn btn-rest" id="btnStartRest" data-od-id="btn-start-rest">开始休息</button>
+        <button type="button" class="btn" id="btnSnooze" data-od-id="btn-snooze">稍后 · 5 分</button>
+      </div>
+      <div class="snooze-note" id="snoozeNote" role="status"></div>
+    </div>
+  </section>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+  <div class="tweaks" data-od-id="tweaks-panel">
+    <details>
+      <summary>演示调节</summary>
+      <div class="tweaks-body">
+        <label>
+          演示加速
+          <select id="tweakSpeed" aria-label="演示加速">
+            <option value="1">实时（1×）</option>
+            <option value="30" selected>快进 30×</option>
+            <option value="60">快进 60×</option>
+          </select>
+        </label>
+        <label>
+          预览提醒窗
+          <select id="tweakReminder" aria-label="预览提醒窗">
+            <option value="auto" selected>自动（到点）</option>
+            <option value="show">始终显示</option>
+            <option value="hide">隐藏</option>
+          </select>
+        </label>
+      </div>
+    </details>
+  </div>
+
+<script>
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{ speed: 30, reminderPreview: "auto" }/*EDITMODE-END*/;
+(function () {
+  const CIRC = 2 * Math.PI * 44;
+  const el = {
+    modePill: document.getElementById("modePill"),
+    modeText: document.getElementById("modeText"),
+    sessionMeta: document.getElementById("sessionMeta"),
+    ringWrap: document.getElementById("ringWrap"),
+    ringProg: document.getElementById("ringProg"),
+    timeDisplay: document.getElementById("timeDisplay"),
+    timeCaption: document.getElementById("timeCaption"),
+    progressPct: document.getElementById("progressPct"),
+    timerLive: document.getElementById("timerLive"),
+    btnPrimary: document.getElementById("btnPrimary"),
+    btnReset: document.getElementById("btnReset"),
+    workRange: document.getElementById("workRange"),
+    restRange: document.getElementById("restRange"),
+    workVal: document.getElementById("workVal"),
+    restVal: document.getElementById("restVal"),
+    soundToggle: document.getElementById("soundToggle"),
+    reminderWin: document.getElementById("reminderWin"),
+    reminderHint: document.getElementById("reminderHint"),
+    reminderDesc: document.getElementById("reminderDesc"),
+    btnStartRest: document.getElementById("btnStartRest"),
+    btnSnooze: document.getElementById("btnSnooze"),
+    snoozeNote: document.getElementById("snoozeNote"),
+    toast: document.getElementById("toast"),
+    tweakSpeed: document.getElementById("tweakSpeed"),
+    tweakReminder: document.getElementById("tweakReminder"),
+  };
+  el.ringProg.style.strokeDasharray = String(CIRC);
+  const state = {
+    phase: "idle", pausedFrom: null,
+    remainingMs: 25 * 60 * 1000, totalMs: 25 * 60 * 1000,
+    workMin: 25, restMin: 5, rounds: 0,
+    timerId: null, lastTick: null, sound: true,
+    speed: TWEAK_DEFAULTS.speed,
+    reminderPreview: TWEAK_DEFAULTS.reminderPreview,
+    snoozeUntil: null, wasReminderVisible: false, lastLiveAnnounce: "",
+  };
+  function fmt(ms) {
+    const s = Math.max(0, Math.ceil(ms / 1000));
+    const m = Math.floor(s / 60), r = s % 60;
+    return String(m).padStart(2, "0") + ":" + String(r).padStart(2, "0");
+  }
+  function paintRange(input) {
+    const min = Number(input.min) || 0, max = Number(input.max) || 100, val = Number(input.value);
+    const pct = max === min ? 0 : ((val - min) / (max - min)) * 100;
+    const fill = "color-mix(in oklch, var(--fg) 28%, var(--border))";
+    input.style.background = "linear-gradient(to right, " + fill + " 0%, " + fill + " " + pct + "%, var(--border) " + pct + "%, var(--border) 100%)";
+  }
+  function showToast(msg) {
+    el.toast.textContent = msg;
+    el.toast.classList.add("show");
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(function () { el.toast.classList.remove("show"); }, 1800);
+  }
+  function playBeep() {
+    if (!state.sound) return;
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const now = ctx.currentTime;
+      [0, 0.18].forEach(function (delay, i) {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = "sine"; o.frequency.value = i === 0 ? 660 : 880;
+        g.gain.setValueAtTime(0.0001, now + delay);
+        g.gain.exponentialRampToValueAtTime(0.12, now + delay + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, now + delay + 0.28);
+        o.connect(g); g.connect(ctx.destination);
+        o.start(now + delay); o.stop(now + delay + 0.32);
+      });
+      setTimeout(function () { ctx.close(); }, 800);
+    } catch (e) { showToast("无法播放提示音"); }
+  }
+  function setPrimaryButton(label, icon, restMode) {
+    el.btnPrimary.querySelector("span").textContent = label;
+    el.btnPrimary.setAttribute("aria-label", label);
+    el.btnPrimary.classList.toggle("is-rest-mode", !!restMode);
+    const svg = el.btnPrimary.querySelector("svg");
+    if (icon === "pause") {
+      svg.innerHTML = '<rect x="3.5" y="2.5" width="3.5" height="11" rx="0.5" fill="currentColor"/><rect x="9" y="2.5" width="3.5" height="11" rx="0.5" fill="currentColor"/>';
+    } else {
+      svg.innerHTML = '<path d="M4 2.5v11l9-5.5-9-5.5z" fill="currentColor"/>';
+    }
+  }
+  function announcePhase(text) {
+    if (text === state.lastLiveAnnounce) return;
+    state.lastLiveAnnounce = text;
+    el.timerLive.textContent = text;
+  }
+  function updateRing() {
+    const p = state.totalMs <= 0 ? 0 : 1 - state.remainingMs / state.totalMs;
+    const clamped = Math.min(1, Math.max(0, p));
+    el.ringProg.style.strokeDashoffset = String(CIRC * (1 - clamped));
+    if (state.phase === "idle") el.progressPct.textContent = "准备就绪";
+    else if (state.phase === "reminding") el.progressPct.textContent = "本轮已完成";
+    else el.progressPct.textContent = "进度 " + Math.round(clamped * 100) + "%";
+  }
+  function updateReminderVisibility() {
+    const preview = state.reminderPreview;
+    const shouldShow = preview === "show" || (preview === "auto" && state.phase === "reminding");
+    if (preview === "hide" || !shouldShow) {
+      el.reminderWin.classList.add("is-hidden");
+      el.reminderWin.classList.remove("is-active");
+      el.reminderWin.setAttribute("aria-hidden", "true");
+      if (state.phase === "reminding" && preview === "auto") el.reminderHint.textContent = "提醒已触发（右下角）";
+      else if (preview === "hide") el.reminderHint.textContent = "提醒窗已隐藏（演示调节）";
+      else el.reminderHint.textContent = "工作结束后将从右下角弹出提醒";
+      state.wasReminderVisible = false;
+    } else {
+      el.reminderWin.classList.remove("is-hidden");
+      el.reminderWin.classList.add("is-active");
+      el.reminderWin.setAttribute("aria-hidden", "false");
+      el.reminderHint.textContent = state.phase === "reminding" ? "右下角等待你的选择" : "预览模式 · 右下角";
+      if (!state.wasReminderVisible) {
+        state.wasReminderVisible = true;
+        requestAnimationFrame(function () { el.btnStartRest.focus({ preventScroll: true }); });
+      }
+    }
+  }
+  function render() {
+    el.timeDisplay.textContent = fmt(state.remainingMs);
+    el.workVal.textContent = state.workMin + " 分";
+    el.restVal.textContent = state.restMin + " 分";
+    el.workRange.setAttribute("aria-valuetext", state.workMin + " 分钟");
+    el.restRange.setAttribute("aria-valuetext", state.restMin + " 分钟");
+    el.workRange.value = String(state.workMin);
+    el.restRange.value = String(state.restMin);
+    paintRange(el.workRange); paintRange(el.restRange);
+    el.sessionMeta.textContent = state.rounds <= 0 ? "尚未开始" : ("第 " + state.rounds + " 轮");
+    el.soundToggle.checked = state.sound;
+    const isRest = state.phase === "rest" || (state.phase === "paused" && state.pausedFrom === "rest");
+    el.ringWrap.classList.toggle("is-rest", isRest || state.phase === "reminding");
+    el.ringWrap.classList.toggle("is-idle", state.phase === "idle");
+    el.modePill.classList.remove("is-idle", "is-work", "is-rest");
+    if (state.phase === "work" || (state.phase === "paused" && state.pausedFrom === "work")) {
+      el.modePill.classList.add("is-work");
+      el.modeText.textContent = state.phase === "paused" ? "已暂停 · 工作" : "工作中";
+      el.timeCaption.textContent = "工作倒计时";
+    } else if (state.phase === "rest" || (state.phase === "paused" && state.pausedFrom === "rest")) {
+      el.modePill.classList.add("is-rest");
+      el.modeText.textContent = state.phase === "paused" ? "已暂停 · 休息" : "休息中";
+      el.timeCaption.textContent = "休息倒计时";
+    } else if (state.phase === "reminding") {
+      el.modePill.classList.add("is-work");
+      el.modeText.textContent = "待确认";
+      el.timeCaption.textContent = "工作已完成";
+    } else {
+      el.modePill.classList.add("is-idle");
+      el.modeText.textContent = "待开始";
+      el.timeCaption.textContent = "设定工作时长";
+    }
+    if (state.phase === "idle") {
+      setPrimaryButton("开始", "play", false);
+      el.btnPrimary.disabled = false; el.btnReset.disabled = true;
+      el.workRange.disabled = false; el.restRange.disabled = false;
+    } else if (state.phase === "work" || state.phase === "rest") {
+      setPrimaryButton("暂停", "pause", state.phase === "rest");
+      el.btnPrimary.disabled = false; el.btnReset.disabled = false;
+      el.workRange.disabled = true; el.restRange.disabled = true;
+    } else if (state.phase === "paused") {
+      setPrimaryButton("继续", "play", state.pausedFrom === "rest");
+      el.btnPrimary.disabled = false; el.btnReset.disabled = false;
+      el.workRange.disabled = true; el.restRange.disabled = true;
+    } else if (state.phase === "reminding") {
+      setPrimaryButton("开始", "play", false);
+      el.btnPrimary.disabled = true;
+      el.btnPrimary.setAttribute("aria-label", "请先在右下角提醒中选择");
+      el.btnReset.disabled = false;
+      el.workRange.disabled = true; el.restRange.disabled = true;
+    }
+    el.reminderDesc.textContent = "本轮工作 " + state.workMin + " 分钟已结束。建议休息 " + state.restMin + " 分钟。";
+    el.snoozeNote.textContent = state.snoozeUntil ? "已延后 5 分钟" : "";
+    updateRing(); updateReminderVisibility();
+  }
+  function stopTicker() {
+    if (state.timerId) { cancelAnimationFrame(state.timerId); state.timerId = null; }
+    state.lastTick = null;
+  }
+  function tick(ts) {
+    if (!state.lastTick) state.lastTick = ts;
+    const delta = (ts - state.lastTick) * state.speed;
+    state.lastTick = ts;
+    if (state.phase === "work" || state.phase === "rest") {
+      state.remainingMs -= delta;
+      if (state.remainingMs <= 0) { state.remainingMs = 0; onPhaseComplete(); return; }
+      render();
+    }
+    state.timerId = requestAnimationFrame(tick);
+  }
+  function startTicker() { stopTicker(); state.timerId = requestAnimationFrame(tick); }
+  function onPhaseComplete() {
+    stopTicker();
+    if (state.phase === "work") {
+      playBeep(); state.phase = "reminding"; state.rounds += 1;
+      announcePhase("工作结束，请选择开始休息或稍后提醒");
+      showToast("工作结束 · 该休息了"); render();
+    } else if (state.phase === "rest") {
+      playBeep(); state.phase = "idle";
+      state.totalMs = state.workMin * 60 * 1000; state.remainingMs = state.totalMs;
+      announcePhase("休息结束，可以开始下一轮");
+      showToast("休息结束 · 准备下一轮"); render();
+    }
+  }
+  function startWork() {
+    state.phase = "work";
+    state.totalMs = state.workMin * 60 * 1000; state.remainingMs = state.totalMs;
+    state.snoozeUntil = null;
+    announcePhase("开始工作，" + state.workMin + " 分钟");
+    startTicker(); render();
+  }
+  function startRest() {
+    state.phase = "rest";
+    state.totalMs = state.restMin * 60 * 1000; state.remainingMs = state.totalMs;
+    state.snoozeUntil = null;
+    announcePhase("开始休息，" + state.restMin + " 分钟");
+    startTicker(); showToast("休息开始"); render();
+    el.btnPrimary.focus({ preventScroll: true });
+  }
+  function pause() {
+    state.pausedFrom = state.phase; state.phase = "paused"; stopTicker();
+    announcePhase("已暂停"); render();
+  }
+  function resume() {
+    state.phase = state.pausedFrom || "work"; state.pausedFrom = null;
+    announcePhase(state.phase === "rest" ? "继续休息" : "继续工作");
+    startTicker(); render();
+  }
+  function reset() {
+    stopTicker(); state.phase = "idle"; state.pausedFrom = null;
+    state.totalMs = state.workMin * 60 * 1000; state.remainingMs = state.totalMs;
+    state.snoozeUntil = null; el.btnPrimary.disabled = false;
+    announcePhase("已重置"); showToast("已重置"); render();
+  }
+  el.btnPrimary.addEventListener("click", function () {
+    if (state.phase === "idle") startWork();
+    else if (state.phase === "work" || state.phase === "rest") pause();
+    else if (state.phase === "paused") resume();
+  });
+  el.btnReset.addEventListener("click", reset);
+  el.workRange.addEventListener("input", function () {
+    state.workMin = Number(el.workRange.value);
+    if (state.phase === "idle") {
+      state.totalMs = state.workMin * 60 * 1000; state.remainingMs = state.totalMs;
+    }
+    render();
+  });
+  el.restRange.addEventListener("input", function () {
+    state.restMin = Number(el.restRange.value); render();
+  });
+  el.soundToggle.addEventListener("change", function () {
+    state.sound = el.soundToggle.checked;
+    if (state.sound) playBeep();
+    showToast(state.sound ? "提示音已开启" : "提示音已关闭");
+  });
+  el.btnStartRest.addEventListener("click", function () {
+    if (state.phase === "reminding" || state.reminderPreview === "show") startRest();
+  });
+  el.btnSnooze.addEventListener("click", function () {
+    if (state.phase !== "reminding" && state.reminderPreview !== "show") return;
+    stopTicker(); state.phase = "work";
+    state.totalMs = 5 * 60 * 1000; state.remainingMs = state.totalMs;
+    state.snoozeUntil = Date.now() + 5 * 60 * 1000;
+    announcePhase("已延后 5 分钟");
+    startTicker(); showToast("已延后 5 分钟"); render();
+    el.btnPrimary.focus({ preventScroll: true });
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape") return;
+    if (!el.reminderWin.classList.contains("is-active")) return;
+    if (state.phase === "reminding" || state.reminderPreview === "show") {
+      e.preventDefault(); el.btnSnooze.click();
+    }
+  });
+  el.tweakSpeed.value = String(TWEAK_DEFAULTS.speed);
+  el.tweakReminder.value = TWEAK_DEFAULTS.reminderPreview;
+  el.tweakSpeed.addEventListener("change", function () {
+    state.speed = Number(el.tweakSpeed.value) || 1;
+    showToast("速度 " + state.speed + "×");
+  });
+  el.tweakReminder.addEventListener("change", function () {
+    state.reminderPreview = el.tweakReminder.value;
+    state.wasReminderVisible = false; render();
+  });
+  state.speed = Number(el.tweakSpeed.value) || 1;
+  state.reminderPreview = el.tweakReminder.value;
+  paintRange(el.workRange); paintRange(el.restRange); render();
+})();
+</script>
+</body>
+</html>

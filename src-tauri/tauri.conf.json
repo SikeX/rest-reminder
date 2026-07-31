@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "RestReminder",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "identifier": "com.restreminder.app",
   "build": {
     "frontendDist": "../dist",
@@ -14,27 +14,31 @@
       {
         "label": "main",
         "title": "Rest Reminder",
-        "width": 500,
-        "height": 800,
-        "minWidth": 450,
-        "minHeight": 700,
+        "width": 400,
+        "height": 620,
+        "minWidth": 360,
+        "minHeight": 560,
         "resizable": true,
         "fullscreen": false,
-        "center": true
+        "center": true,
+        "decorations": true,
+        "dragDropEnabled": false
       },
       {
         "label": "reminder",
         "title": "提醒",
-        "width": 400,
-        "height": 550,
-        "minWidth": 400,
-        "minHeight": 550,
+        "width": 360,
+        "height": 220,
+        "minWidth": 320,
+        "minHeight": 180,
         "resizable": false,
         "alwaysOnTop": true,
-        "decorations": false,
-        "center": true,
+        "decorations": true,
         "visible": false,
-        "skipTaskbar": true
+        "skipTaskbar": true,
+        "center": false,
+        "focus": false,
+        "dragDropEnabled": false
       }
     ],
     "security": {

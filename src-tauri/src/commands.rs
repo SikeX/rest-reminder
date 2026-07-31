@@ -94,10 +94,7 @@ pub async fn close_reminder_window(app: AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn show_reminder_window(app: AppHandle) -> Result<(), String> {
-    if let Some(window) = app.get_webview_window("reminder") {
-        window.show().map_err(|e| e.to_string())?;
-        window.set_focus().map_err(|e| e.to_string())?;
-    }
+    crate::show_reminder(&app, "提醒");
     Ok(())
 }
 
