@@ -77,8 +77,8 @@ export function ReminderWindow() {
     if (isWorkReminder) {
       await hideWindow();
     } else {
-      setSnoozeNote("已延后 5 分钟");
-      await invoke("skip_rest");
+      setSnoozeNote("5 分钟后再次提醒");
+      await invoke("snooze_rest");
       await hideWindow();
     }
   };

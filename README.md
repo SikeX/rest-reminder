@@ -10,6 +10,7 @@
 - 🕐 **精准计时器** - 基于 Rust tokio 实现的精准倒计时
 - ⏱️ **可配置时长** - 工作时长 1-120 分钟，休息时长 1-30 分钟
 - 🔔 **屏幕弹窗提醒** - 工作完成后屏幕顶部显示美观的提醒弹窗
+- 📊 **专注统计** - 查看累计专注、完成轮次、累计休息和延后提醒次数
 - 📦 **系统托盘驻留** - 应用最小化到托盘，不占用任务栏
 - 💾 **配置持久化** - 自动保存你的设置，下次启动时恢复
 - 🎨 **现代扁平化 UI** - 使用 Tailwind CSS 设计的渐变色界面
@@ -36,10 +37,10 @@
 
 从 [Releases](../../releases) 页面下载对应平台的安装包：
 
-- **Windows**: `rest-reminder_1.2.0_x64-setup.exe`
-- **macOS (Apple Silicon)**: `RestReminder_1.2.0_aarch64.dmg`
-- **macOS (Intel)**: `RestReminder_1.2.0_x64.dmg`
-- **Linux**: `rest-reminder_1.2.0_amd64.deb` 或 `.AppImage`
+- **Windows**: `rest-reminder_1.2.1_x64-setup.exe`
+- **macOS (Apple Silicon)**: `RestReminder_1.2.1_aarch64.dmg`
+- **macOS (Intel)**: `RestReminder_1.2.1_x64.dmg`
+- **Linux**: `rest-reminder_1.2.1_amd64.deb` 或 `.AppImage`
 
 ### 方式二：从源码构建
 
@@ -84,12 +85,17 @@ npm run tauri build
 2. 工作时间结束后，会弹出提醒窗口
 3. 点击 **开始休息** 进入休息倒计时
 4. 休息结束后自动开始新的工作周期
+5. 点击 **稍后提醒** 不会立即开始工作计时，5 分钟后会再次弹出休息提醒
 
 ### 控制按钮
 
 - **开始** - 启动计时器
 - **暂停** - 暂停当前计时
 - **重置** - 重置到初始状态
+
+### 统计
+
+点击主窗口顶部的 **统计**，可以查看累计专注时长、完成轮次、累计休息、延后提醒次数，以及当前计时进度。
 
 ### 系统托盘
 

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTimer } from "../hooks/useTimer";
+import { StatisticsView } from "./StatisticsView";
 import type { TimerConfig, TimerState, TimerStatus } from "../types/timer";
 
 const RING_CIRC = 2 * Math.PI * 44; // r=44
@@ -47,6 +48,15 @@ function modeMeta(status: TimerStatus): {
       isRestVisual: true,
     };
   }
+  if (state === "snoozing") {
+    return {
+      pillClass: "is-snoozing",
+      modeText: "已延后",
+      caption: "距离再次提醒",
+      ringClass: "is-snoozing",
+      isRestVisual: true,
+    };
+  }
   if (state === "paused") {
     return {
       pillClass: "is-work",
@@ -67,6 +77,7 @@ function modeMeta(status: TimerStatus): {
 
 function progressLabel(state: TimerState, progress: number): string {
   if (state === "idle") return "准备就绪";
+  if (state === "snoozing") return "延后提醒中";
   return `进度 ${Math.round(progress * 100)}%`;
 }
 
@@ -96,10 +107,29 @@ function ResetIcon() {
   );
 }
 
+function TimerIcon() {
+  return (
+    <svg viewBox="0 0 18 18" fill="none" aria-hidden="true">
+      <circle cx="9" cy="10" r="5.5" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M9 7v3l2 1.25M7 2.25h4M9 2.25v1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function ChartIcon() {
+  return (
+    <svg viewBox="0 0 18 18" fill="none" aria-hidden="true">
+      <path d="M3 14.5V10M7 14.5V6M11 14.5V8M15 14.5V3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M2.5 14.5h13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function MainWindow() {
   const {
     status,
     config,
+    stats,
     isLoading,
     errorMsg,
     start,
@@ -111,6 +141,7 @@ export function MainWindow() {
   const workRangeRef = useRef<HTMLInputElement>(null);
   const restRangeRef = useRef<HTMLInputElement>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [view, setView] = useState<"timer" | "stats">("timer");
   const toastTimer = useRef<number | null>(null);
   const lastAnnounce = useRef("");
 
@@ -136,6 +167,7 @@ export function MainWindow() {
     let text = "";
     if (status.state === "working") text = "工作中";
     else if (status.state === "resting") text = "休息中";
+    else if (status.state === "snoozing") text = "已延后";
     else if (status.state === "paused") text = "已暂停";
     else if (status.state === "idle") text = "待开始";
     if (text && text !== lastAnnounce.current) {
@@ -185,7 +217,7 @@ export function MainWindow() {
     );
   }
 
-  if (isLoading || !status || !config || !meta) {
+  if (isLoading || !status || !config || !stats || !meta) {
     return (
       <div className="state-screen" aria-busy="true">
         <h2>加载中…</h2>
@@ -195,11 +227,20 @@ export function MainWindow() {
   }
 
   const isRunning = status.state === "working" || status.state === "resting";
-  const primaryLabel = isRunning ? "暂停" : status.state === "paused" ? "继续" : "开始";
+  const primaryLabel = status.state === "snoozing"
+    ? "延后中"
+    : isRunning
+      ? "暂停"
+      : status.state === "paused"
+        ? "继续"
+        : "开始";
+  const primaryDisabled = status.state === "snoozing";
   const settingsLocked = status.state !== "idle";
   const resetDisabled = status.state === "idle";
   const hintText =
-    status.state === "resting"
+    status.state === "snoozing"
+      ? "5 分钟后再次弹出休息提醒"
+      : status.state === "resting"
       ? "休息进行中"
       : isRunning
         ? "专注进行中"
@@ -207,8 +248,36 @@ export function MainWindow() {
 
   return (
     <div className="app-shell" aria-label="Rest Reminder 主窗口">
-      <div className="main-body">
-        <div className="mode-row">
+      <header className="app-header">
+        <div className="brand-lockup">
+          <span className="brand-mark" aria-hidden="true"><TimerIcon /></span>
+          <span className="brand-name">Rest Reminder</span>
+        </div>
+        <nav className="view-switch" aria-label="主视图">
+          <button
+            type="button"
+            className={`view-tab${view === "timer" ? " is-active" : ""}`}
+            aria-current={view === "timer" ? "page" : undefined}
+            onClick={() => setView("timer")}
+          >
+            <TimerIcon />
+            <span>计时</span>
+          </button>
+          <button
+            type="button"
+            className={`view-tab${view === "stats" ? " is-active" : ""}`}
+            aria-current={view === "stats" ? "page" : undefined}
+            onClick={() => setView("stats")}
+          >
+            <ChartIcon />
+            <span>统计</span>
+          </button>
+        </nav>
+      </header>
+
+      {view === "timer" ? (
+        <main className="main-body">
+          <div className="mode-row">
           <div
             className={`mode-pill ${meta.pillClass}`}
             role="status"
@@ -220,9 +289,9 @@ export function MainWindow() {
           <div className="session-meta">
             {status.cycle_count <= 0 ? "尚未开始" : `第 ${status.cycle_count} 轮`}
           </div>
-        </div>
+          </div>
 
-        <div className="timer-block">
+          <div className="timer-block">
           <div
             className={`ring-wrap ${meta.ringClass}`}
             role="img"
@@ -250,13 +319,14 @@ export function MainWindow() {
           <div className="sr-only" aria-live="polite" aria-atomic="true">
             {lastAnnounce.current}
           </div>
-        </div>
+          </div>
 
-        <div className="controls">
+          <div className="controls">
           <button
             type="button"
             className={`btn btn-primary${meta.isRestVisual && isRunning ? " is-rest-mode" : ""}`}
             onClick={handlePrimary}
+            disabled={primaryDisabled}
             aria-label={primaryLabel}
           >
             {isRunning ? <PauseIcon /> : <PlayIcon />}
@@ -272,9 +342,9 @@ export function MainWindow() {
             <ResetIcon />
             重置
           </button>
-        </div>
+          </div>
 
-        <div className="settings">
+          <div className="settings">
           <div className="setting-row">
             <label className="setting-label" htmlFor="workRange">
               工作
@@ -345,10 +415,15 @@ export function MainWindow() {
               <span className="switch-track" aria-hidden="true" />
             </label>
           </div>
-        </div>
+          </div>
 
-        <p className="app-hint">{hintText}</p>
-      </div>
+          <p className="app-hint">{hintText}</p>
+        </main>
+      ) : (
+        <main className="main-body stats-body">
+          <StatisticsView stats={stats} status={status} config={config} />
+        </main>
+      )}
 
       <div
         className={`toast${toast ? " show" : ""}`}

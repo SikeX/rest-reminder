@@ -5,7 +5,7 @@ use std::sync::Arc;
 use tauri::{Manager, PhysicalPosition, Position, WebviewWindow};
 use tauri_plugin_store::StoreBuilder;
 use tokio::sync::Mutex;
-use timer::{run_timer_loop, SharedTimer, Timer, TimerConfig, TimerStateChange};
+use timer::{run_timer_loop, SharedTimer, Timer, TimerConfig, TimerStats, TimerStateChange};
 
 /// Place the reminder window at the bottom-right of the primary work area
 /// (above the Windows taskbar / macOS dock). Prefer primary monitor so a
@@ -107,6 +107,31 @@ pub fn show_reminder(app: &tauri::AppHandle, title: &str) {
     }
 }
 
+fn load_stats(store: &tauri_plugin_store::Store<tauri::Wry>) -> TimerStats {
+    TimerStats {
+        total_focus_seconds: store
+            .get("total_focus_seconds")
+            .and_then(|value| value.as_u64())
+            .unwrap_or(0),
+        total_rest_seconds: store
+            .get("total_rest_seconds")
+            .and_then(|value| value.as_u64())
+            .unwrap_or(0),
+        completed_work_sessions: store
+            .get("completed_work_sessions")
+            .and_then(|value| value.as_u64())
+            .unwrap_or(0) as u32,
+        completed_rest_sessions: store
+            .get("completed_rest_sessions")
+            .and_then(|value| value.as_u64())
+            .unwrap_or(0) as u32,
+        snoozed_count: store
+            .get("snoozed_count")
+            .and_then(|value| value.as_u64())
+            .unwrap_or(0) as u32,
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -137,8 +162,10 @@ pub fn run() {
             store.set("enable_sound", config.enable_sound);
             let _ = store.save();
 
+            let stats = load_stats(&store);
+
             // 创建计时器
-            let timer = Timer::new(config.clone());
+            let timer = Timer::new(config.clone(), stats);
             let shared_timer: SharedTimer = Arc::new(Mutex::new(timer));
             app.manage(shared_timer.clone());
 
@@ -152,8 +179,19 @@ pub fn run() {
                 run_timer_loop(timer_clone, tx, app_handle_for_timer).await;
             });
 
+            let timer_for_events = shared_timer.clone();
             tauri::async_runtime::spawn(async move {
                 while let Some(change) = rx.recv().await {
+                    let stats = {
+                        let t = timer_for_events.lock().await;
+                        t.get_stats()
+                    };
+                    if let Err(error) = commands::persist_stats(&app_handle, &stats) {
+                        log::warn!("Failed to persist timer stats: {error}");
+                    }
+                    use tauri::Emitter;
+                    let _ = app_handle.emit("stats-update", &stats);
+
                     match change {
                         TimerStateChange::WorkComplete => {
                             log::info!("Work complete, showing reminder at bottom-right");
@@ -168,6 +206,11 @@ pub fn run() {
                             use tauri::Emitter;
                             let _ = app_handle.emit("show-work-reminder", ());
                             show_reminder(&app_handle, "工作提醒");
+                        }
+                        TimerStateChange::SnoozeComplete => {
+                            log::info!("Snooze complete, showing rest reminder at bottom-right");
+                            let _ = app_handle.emit("show-reminder", ());
+                            show_reminder(&app_handle, "休息提醒");
                         }
                     }
                 }
@@ -198,10 +241,11 @@ pub fn run() {
             commands::pause_timer,
             commands::reset_timer,
             commands::get_state,
+            commands::get_stats,
             commands::set_config,
             commands::get_config,
             commands::start_rest,
-            commands::skip_rest,
+            commands::snooze_rest,
             commands::close_reminder_window,
             commands::show_reminder_window,
             commands::save_config

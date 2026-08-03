@@ -10,6 +10,7 @@ pub enum TimerState {
     Idle,
     Working,
     Resting,
+    Snoozing,
     Paused,
 }
 
@@ -29,6 +30,17 @@ pub struct TimerConfig {
     pub enable_sound: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct TimerStats {
+    pub total_focus_seconds: u64,
+    pub total_rest_seconds: u64,
+    pub completed_work_sessions: u32,
+    pub completed_rest_sessions: u32,
+    pub snoozed_count: u32,
+}
+
+pub const SNOOZE_DURATION_SECONDS: u64 = 5 * 60;
+
 impl Default for TimerConfig {
     fn default() -> Self {
         Self {
@@ -42,6 +54,7 @@ impl Default for TimerConfig {
 pub struct Timer {
     state: TimerState,
     config: TimerConfig,
+    stats: TimerStats,
     elapsed: u64,
     total: u64,
     cycle_count: u32,
@@ -50,11 +63,12 @@ pub struct Timer {
 }
 
 impl Timer {
-    pub fn new(config: TimerConfig) -> Self {
+    pub fn new(config: TimerConfig, stats: TimerStats) -> Self {
         let total = config.work_duration * 60;
         Self {
             state: TimerState::Idle,
             config,
+            stats,
             elapsed: 0,
             total,
             cycle_count: 0,
@@ -86,11 +100,7 @@ impl Timer {
         self.elapsed = 0;
         self.paused_elapsed = 0;
         self.start_time = None;
-        if self.cycle_count % 2 == 0 {
-            self.total = self.config.work_duration * 60;
-        } else {
-            self.total = self.config.rest_duration * 60;
-        }
+        self.total = self.config.work_duration * 60;
     }
 
     pub fn start_rest(&mut self) {
@@ -101,12 +111,17 @@ impl Timer {
         self.paused_elapsed = 0;
     }
 
-    pub fn skip_rest(&mut self) {
-        self.state = TimerState::Working;
+    pub fn snooze_rest(&mut self) {
+        if self.state != TimerState::Idle {
+            return;
+        }
+
+        self.state = TimerState::Snoozing;
         self.elapsed = 0;
-        self.total = self.config.work_duration * 60;
+        self.total = SNOOZE_DURATION_SECONDS;
         self.start_time = Some(Instant::now());
         self.paused_elapsed = 0;
+        self.stats.snoozed_count += 1;
     }
 
     pub fn set_config(&mut self, config: TimerConfig) {
@@ -123,6 +138,8 @@ impl Timer {
             if self.elapsed >= self.total {
                 return match self.state {
                     TimerState::Working => {
+                        self.stats.total_focus_seconds += self.total;
+                        self.stats.completed_work_sessions += 1;
                         self.cycle_count += 1;
                         self.state = TimerState::Idle;
                         self.elapsed = 0;
@@ -131,12 +148,22 @@ impl Timer {
                         Some(TimerStateChange::WorkComplete)
                     }
                     TimerState::Resting => {
+                        self.stats.total_rest_seconds += self.total;
+                        self.stats.completed_rest_sessions += 1;
                         self.state = TimerState::Working;
                         self.elapsed = 0;
                         self.paused_elapsed = 0;
                         self.total = self.config.work_duration * 60;
                         self.start_time = Some(Instant::now());
                         Some(TimerStateChange::RestComplete)
+                    }
+                    TimerState::Snoozing => {
+                        self.state = TimerState::Idle;
+                        self.elapsed = 0;
+                        self.paused_elapsed = 0;
+                        self.total = self.config.rest_duration * 60;
+                        self.start_time = None;
+                        Some(TimerStateChange::SnoozeComplete)
                     }
                     _ => None,
                 };
@@ -160,8 +187,8 @@ impl Timer {
         self.config.clone()
     }
 
-    pub fn get_state(&self) -> TimerState {
-        self.state
+    pub fn get_stats(&self) -> TimerStats {
+        self.stats.clone()
     }
 }
 
@@ -169,6 +196,7 @@ impl Timer {
 pub enum TimerStateChange {
     WorkComplete,
     RestComplete,
+    SnoozeComplete,
 }
 
 pub type SharedTimer = Arc<Mutex<Timer>>;
@@ -181,18 +209,40 @@ pub async fn run_timer_loop(
     let mut interval = interval(Duration::from_secs(1));
     loop {
         interval.tick().await;
-        let mut t = timer.lock().await;
-        
-        // Always emit timer status if Working or Resting
-        let state = t.state;
-        if state == TimerState::Working || state == TimerState::Resting {
-            let status = t.get_status();
+        let (status, change) = {
+            let mut t = timer.lock().await;
+            let change = t.update();
+            (t.get_status(), change)
+        };
+
+        if status.state == TimerState::Working
+            || status.state == TimerState::Resting
+            || status.state == TimerState::Snoozing
+            || change.is_some()
+        {
             use tauri::Emitter;
             let _ = app.emit("timer-update", &status);
         }
 
-        if let Some(change) = t.update() {
+        if let Some(change) = change {
             let _ = tx.send(change).await;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn snooze_enters_a_separate_five_minute_state() {
+        let mut timer = Timer::new(TimerConfig::default(), TimerStats::default());
+
+        timer.snooze_rest();
+
+        let status = timer.get_status();
+        assert_eq!(status.state, TimerState::Snoozing);
+        assert_eq!(status.remaining, SNOOZE_DURATION_SECONDS);
+        assert_eq!(timer.get_stats().snoozed_count, 1);
     }
 }

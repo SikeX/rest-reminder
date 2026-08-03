@@ -1,26 +1,32 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { TimerStatus, TimerConfig } from "../types/timer";
+import type { TimerConfig, TimerStats, TimerStatus } from "../types/timer";
 
 export function useTimer() {
   const [status, setStatus] = useState<TimerStatus | null>(null);
   const [config, setConfig] = useState<TimerConfig | null>(null);
+  const [stats, setStats] = useState<TimerStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     loadState();
     loadConfig();
+    loadStats();
 
     // 计时状态由后端 timer loop 推送；提醒窗的显示/定位也由后端负责
     //（show-reminder / show-work-reminder + place_reminder_bottom_right）。
     const unlistenTimer = listen<TimerStatus>("timer-update", (event) => {
       setStatus(event.payload);
     });
+    const unlistenStats = listen<TimerStats>("stats-update", (event) => {
+      setStats(event.payload);
+    });
 
     return () => {
       unlistenTimer.then((f) => f());
+      unlistenStats.then((f) => f());
     };
   }, []);
 
@@ -42,6 +48,16 @@ export function useTimer() {
       setConfig(cfg);
     } catch (error) {
       console.error("Failed to load config:", error);
+      setErrorMsg(String(error));
+    }
+  };
+
+  const loadStats = async () => {
+    try {
+      const currentStats = await invoke<TimerStats>("get_stats");
+      setStats(currentStats);
+    } catch (error) {
+      console.error("Failed to load timer stats:", error);
       setErrorMsg(String(error));
     }
   };
@@ -77,14 +93,10 @@ export function useTimer() {
     await invoke("start_rest");
   };
 
-  const skipRest = async () => {
-    await closeReminderWindow();
-    await invoke("skip_rest");
-  };
-
   return {
     status,
     config,
+    stats,
     isLoading,
     errorMsg,
     start,
@@ -94,6 +106,5 @@ export function useTimer() {
     showReminderWindow,
     closeReminderWindow,
     startRest,
-    skipRest,
   };
 }
