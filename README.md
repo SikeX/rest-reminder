@@ -36,9 +36,10 @@
 
 从 [Releases](../../releases) 页面下载对应平台的安装包：
 
-- **Windows**: `rest-reminder_1.0.0_x64-setup.exe`
-- **macOS**: `Rest Reminder_1.0.0_x64.dmg`
-- **Linux**: `rest-reminder_1.0.0_amd64.deb` 或 `.AppImage`
+- **Windows**: `rest-reminder_1.2.0_x64-setup.exe`
+- **macOS (Apple Silicon)**: `RestReminder_1.2.0_aarch64.dmg`
+- **macOS (Intel)**: `RestReminder_1.2.0_x64.dmg`
+- **Linux**: `rest-reminder_1.2.0_amd64.deb` 或 `.AppImage`
 
 ### 方式二：从源码构建
 
@@ -203,3 +204,15 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 - [Tauri](https://tauri.app/) - 跨平台桌面应用框架
 - [React](https://react.dev/) - 用户界面库
 - [Tailwind CSS](https://tailwindcss.com/) - CSS 框架
+### Q: macOS 提示"已损坏，无法打开"，怎么办？
+
+A: 这是 macOS Gatekeeper 对未签名应用的拦截（CI 构建默认未签名，从浏览器下载的应用会带隔离标记）。临时解决办法：
+
+1. **右键点击应用 → 打开**，在弹窗中确认打开（一次即可）
+2. 或打开 **系统设置 → 隐私与安全性 → 仍要打开**
+3. 或终端执行（推荐）：
+   ```bash
+   sudo xattr -rd com.apple.quarantine "/Applications/RestReminder.app"
+   ```
+
+后续版本已启用 macOS 签名配置（CI 支持正式签名与公证），配置 Apple Developer 凭据后新版本不再出现该提示。
