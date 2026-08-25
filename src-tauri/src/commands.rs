@@ -18,6 +18,7 @@ pub fn persist_stats(app: &AppHandle, stats: &TimerStats) -> Result<(), String> 
     store.set("completed_work_sessions", stats.completed_work_sessions);
     store.set("completed_rest_sessions", stats.completed_rest_sessions);
     store.set("snoozed_count", stats.snoozed_count);
+    store.set("stats_date", stats.stats_date.clone());
     store.save().map_err(|e| e.to_string())?;
     Ok(())
 }

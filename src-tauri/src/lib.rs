@@ -108,6 +108,20 @@ pub fn show_reminder(app: &tauri::AppHandle, title: &str) {
 }
 
 fn load_stats(store: &tauri_plugin_store::Store<tauri::Wry>) -> TimerStats {
+    // 按天统计：持久化的数据不是今天产生的（或没有日期）则从零开始
+    let today = chrono::Local::now().date_naive().to_string();
+    let stored_date = store
+        .get("stats_date")
+        .and_then(|value| value.as_str().map(String::from))
+        .unwrap_or_default();
+
+    if stored_date != today {
+        return TimerStats {
+            stats_date: today,
+            ..Default::default()
+        };
+    }
+
     TimerStats {
         total_focus_seconds: store
             .get("total_focus_seconds")
@@ -129,6 +143,7 @@ fn load_stats(store: &tauri_plugin_store::Store<tauri::Wry>) -> TimerStats {
             .get("snoozed_count")
             .and_then(|value| value.as_u64())
             .unwrap_or(0) as u32,
+        stats_date: today,
     }
 }
 

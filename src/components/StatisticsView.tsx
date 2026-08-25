@@ -85,7 +85,7 @@ export function StatisticsView({ stats, status, config }: StatisticsViewProps) {
     {
       className: "stat-card-focus",
       icon: <FocusIcon />,
-      label: "累计专注",
+      label: "今日专注",
       value: formatDuration(stats.total_focus_seconds),
       note: "已完成工作时段",
     },
@@ -99,7 +99,7 @@ export function StatisticsView({ stats, status, config }: StatisticsViewProps) {
     {
       className: "stat-card-rest",
       icon: <RestIcon />,
-      label: "累计休息",
+      label: "今日休息",
       value: formatDuration(stats.total_rest_seconds),
       note: `${stats.completed_rest_sessions.toLocaleString("zh-CN")} 次完整休息`,
     },
@@ -116,7 +116,7 @@ export function StatisticsView({ stats, status, config }: StatisticsViewProps) {
     <section className="stats-view" aria-labelledby="statsTitle">
       <div className="stats-heading">
         <div>
-          <p className="stats-kicker">累计数据</p>
+          <p className="stats-kicker">今日数据</p>
           <h1 id="statsTitle">统计概览</h1>
         </div>
         <span className="stats-live"><span aria-hidden="true" />实时</span>

@@ -20,4 +20,5 @@ export interface TimerStats {
   completed_work_sessions: number;
   completed_rest_sessions: number;
   snoozed_count: number;
+  stats_date?: string;
 }
